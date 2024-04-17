@@ -1,70 +1,38 @@
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
-
-import logging
-import warnings
-warnings.filterwarnings("ignore")
-logging.basicConfig(level=logging.INFO)
+import argparse
+import subprocess
+from chatbot import generate_response
+from text_to_speech import initialize_xtts_text_to_speech
 
 
-# Chat settings
-SOURCE_LANGUAGE = "English"
-TARGET_LANGUAGE = "French"
-CHAT_HISTORY = [
-    {
-        "role": "system",
-        "content": (
-            f"You are a friendly teacher who aims to help your student learn the {TARGET_LANGUAGE} language."
-            f" Always answer in {TARGET_LANGUAGE} then provide explanations in {SOURCE_LANGUAGE}."
-            f" Your answers should be simple, clear and under 100 tokens."
-        )
-    },
-]
-
-# Limit GPU memory usage to 10 GB
-torch.cuda.empty_cache()
-MAX_MEMORY = 10
-TOTAL_MEMORY = torch.cuda.get_device_properties(0).total_memory / 1024**3
-MEMORY_LIMIT_FRACTION = MAX_MEMORY / TOTAL_MEMORY
-print(f"Total GPU memory: {TOTAL_MEMORY:.2f} GB")
-print(f"New GPU memory limit: {MEMORY_LIMIT_FRACTION * TOTAL_MEMORY:.2f} GB")
-torch.cuda.set_per_process_memory_fraction(MEMORY_LIMIT_FRACTION)
-
-# Load main LLM
-LLM_MODEL_ID = "openchat/openchat-3.5-0106"
-ASSISTANT_DELIMITER = 'GPT4 Correct Assistant:'
-tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_ID)
-model = AutoModelForCausalLM.from_pretrained(LLM_MODEL_ID, load_in_4bit=True)
-model.eval()
-
-def generate_response(text, debug=False, **generation_kwargs):
-    """Generate a response given a user input."""
-    CHAT_HISTORY.append({"role": "user", "content": text})
-    input_ids = tokenizer.apply_chat_template(CHAT_HISTORY, tokenize=True, add_generation_prompt=True, return_tensors="pt")
-    if debug:
-        print(tokenizer.apply_chat_template(CHAT_HISTORY, tokenize=False, add_generation_prompt=True))
-
-    output = model.generate(
-        input_ids,
-        max_new_tokens=150,
-        temperature=0.1,
-        **generation_kwargs
+def play_audio():
+    subprocess.run(
+        ["play", "output.wav"],
+        capture_output=True,
+        text=True,
+        check=True,
     )
-    output = tokenizer.decode(output[0], skip_special_tokens=True)
-    output = output.split(ASSISTANT_DELIMITER)[-1].strip()
-    CHAT_HISTORY.append({"role": "assistant", "content": output})
-    return output
 
 
 if __name__ == "__main__":
-    user_queries = [
-        "Hello, how are you?",
-        "Can you help me learn French?",
-        "How can I ask for directions in French?",
-    ]
 
-    print("\nThe chatbot is ready to chat!\n--->\n")
-    for user_query in user_queries:
-        response = generate_response(user_query)
-        print(f"User: {user_query}")
-        print(f"Assistant: {response}\n")
+    argument_parser = argparse.ArgumentParser()
+    argument_parser.add_argument(
+        "--language",
+        type=str,
+        default="en",
+        help="The language of the assistant",
+    )
+    args = argument_parser.parse_args()
+
+
+    convert_text_to_speech = initialize_xtts_text_to_speech(language=args.language)
+    def speak(text, language):
+        convert_text_to_speech(text, language=language)
+        play_audio()
+
+
+    while True:
+        user_input = input()
+        response = generate_response(user_input, language=args.language)
+        print(f"[[ Assistant ]]: {response}\n")
+        speak(response, language=args.language)

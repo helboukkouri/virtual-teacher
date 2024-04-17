@@ -8,5 +8,9 @@ sentencepiece
 numpy
 
 sounddevice
+cutlet
+fugashi[unidic]  # python -m unidic download
+langcodes[data]
+TTS
 
 ipdb
