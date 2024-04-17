@@ -1,0 +1,12 @@
+torch
+torchaudio
+transformers
+bitsandbytes
+accelerate
+sentencepiece
+
+numpy
+
+sounddevice
+
+ipdb
