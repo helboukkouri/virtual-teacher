@@ -7,12 +7,14 @@ import soundfile as sf
 from faster_whisper import WhisperModel
 
 USER_QUERY_AUDIO_FILE = "user_query.wav"
+retries = 0
 
 def record_audio():
+    global retries
+
     channels = 1    
 
-    device = None
-    device_info = sd.query_devices(device, 'input')
+    device_info = sd.query_devices(0)
     samplerate = int(device_info['default_samplerate'])
 
     q = queue.Queue()
@@ -26,13 +28,19 @@ def record_audio():
         input('Press a key to start recording..')
         # Make sure the file is opened before recording anything:
         with sf.SoundFile(USER_QUERY_AUDIO_FILE, mode='w', samplerate=samplerate, channels=channels) as file:
-            with sd.InputStream(samplerate=samplerate, device=device, channels=channels, callback=callback):
+            with sd.InputStream(samplerate=samplerate, device=device_info["name"], channels=channels, callback=callback):
                 print("[[ Recording started ]]")
                 while True:
                     file.write(q.get())
 
+    except sd.PortAudioError:
+        # Allow for a couple retries
+        if retries < 2:
+            retries += 1
+            record_audio()
+
     except KeyboardInterrupt:
-        pass
+        retries = 0
 
 
 def initialize_whisper_speech_recognition():
