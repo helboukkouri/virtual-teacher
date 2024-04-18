@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import langdetect
 import subprocess
 
 import torch
@@ -33,7 +34,7 @@ def initialize_mms_text_to_speech():
 
 
 # TODO: refactor this
-def initialize_xtts_text_to_speech(language):
+def initialize_xtts_text_to_speech():
     
     model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
     ModelManager().download_model(model_name)
@@ -58,19 +59,25 @@ def initialize_xtts_text_to_speech(language):
 
     def convert_text_to_speech(
         text,
-        language=language,
+        language=None,
         use_mic=False,
         voice_cleanup=True,
-        no_lang_auto_detect=False,
         debug=False
     ):
         prompt = text
-        if language not in supported_languages:
+        if language is not None and language not in supported_languages:
             raise Exception(
                 f"Language you put {language} in is not in is not in our Supported Languages, please choose from dropdown."
             )
     
-        language_predicted = language # langid.classify(prompt)[0].strip()  # strip need as there is space at end!
+        if language is None:
+            language_predicted = langdetect.detect(text.strip())
+            if language_predicted not in supported_languages:
+                print(f"Detected language: {language_predicted}. But this language is not supported.")
+                print(f"Fallback to default language: English.")
+                language_predicted = "en"
+        else:
+            language_predicted = language
     
         # tts expects chinese as zh-cn
         if language_predicted == "zh":
@@ -79,18 +86,7 @@ def initialize_xtts_text_to_speech(language):
     
         if debug:
             print(f"Detected language:{language_predicted}, Chosen language:{language}")
-    
-        # After text character length 15 trigger language detection
-        if len(prompt) > 15:
-            # allow any language for short text as some may be common
-            # If user unchecks language autodetection it will not trigger
-            # You may remove this completely for own use
-            if language_predicted != language and not no_lang_auto_detect:
-                # Please duplicate and remove this check if you really want this
-                # Or auto-detector fails to identify language (which it can on pretty short text or mixed text)
-                raise Exception(
-                    "It looks like your text isn’t the language you chose , if you’re sure the text is the same language you chose, please check disable language auto-detection checkbox"
-                )
+        language = language_predicted  # for the rest of the code
     
         if use_mic == True:
             raise Exception(
@@ -132,7 +128,7 @@ def initialize_xtts_text_to_speech(language):
         else:
             speaker_wav = speaker_wav
     
-        if len(prompt) < 2:
+        if len(prompt) < 2 and language_predicted not in ("ko", "ja", "zh-cn"):
             raise Exception("Please give a longer prompt text")
         if len(prompt) > MAX_CHARS:
             raise Exception(
@@ -168,7 +164,7 @@ def initialize_xtts_text_to_speech(language):
         t0 = time.time()
         out = model.inference(
             prompt,
-            language,
+            language_predicted,
             gpt_cond_latent,
             speaker_embedding,
             repetition_penalty=5.0,
