@@ -15,18 +15,21 @@ MAX_NEW_TOKENS = 300
 CHAT_HISTORY = []
 
 # Limit LLM GPU memory usage to 10 GB
-torch.cuda.empty_cache()
-MAX_MEMORY = 10
-TOTAL_MEMORY = torch.cuda.get_device_properties(0).total_memory / 1024**3
-MEMORY_LIMIT_FRACTION = MAX_MEMORY / TOTAL_MEMORY
-print(f"Total GPU memory: {TOTAL_MEMORY:.2f} GB")
-print(f"LLM GPU memory limit: {MEMORY_LIMIT_FRACTION * TOTAL_MEMORY:.2f} GB")
-torch.cuda.set_per_process_memory_fraction(MEMORY_LIMIT_FRACTION)
-
+#torch.cuda.empty_cache()
+#MAX_MEMORY = 10
+#TOTAL_MEMORY = torch.cuda.get_device_properties(0).total_memory / 1024**3
+#MEMORY_LIMIT_FRACTION = MAX_MEMORY / TOTAL_MEMORY
+#print(f"Total GPU memory: {TOTAL_MEMORY:.2f} GB")
+#print(f"LLM GPU memory limit: {MEMORY_LIMIT_FRACTION * TOTAL_MEMORY:.2f} GB")
+#torch.cuda.set_per_process_memory_fraction(MEMORY_LIMIT_FRACTION)
 
 # Load main LLM
-LLM_MODEL_ID = "meta-llama/Meta-Llama-3-8B-Instruct"#"openchat/openchat-3.5-0106"
-ASSISTANT_DELIMITER = "<|start_header_id|>assistant<|end_header_id|>"#'GPT4 Correct Assistant:'
+#LLM_MODEL = "OPENCHAT-3.5"
+LLM_MODEL = "LLAMA-3"
+if LLM_MODEL == "LLAMA-3":
+    LLM_MODEL_ID = "meta-llama/Meta-LLAMA-3-8B-Instruct"
+else:
+    LLM_MODEL_ID = "openchat/openchat-3.5-0106"
 tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_ID)
 model = AutoModelForCausalLM.from_pretrained(LLM_MODEL_ID, load_in_4bit=True)
 model.eval()
@@ -56,10 +59,9 @@ def generate_response(text, language, system_prompt=None, keep_chat_history=Fals
     if debug:
         print(tokenizer.apply_chat_template(CHAT_HISTORY, tokenize=False, add_generation_prompt=True))
 
-    terminators = [
-        tokenizer.eos_token_id,
-        tokenizer.convert_tokens_to_ids("<|eot_id|>")
-    ]
+    terminators = [tokenizer.eos_token_id]
+    if LLM_MODEL == "LLAMA-3":
+        terminators += [tokenizer.convert_tokens_to_ids("<|eot_id|>")]
 
     outputs = model.generate(
         input_ids,

@@ -1,3 +1,4 @@
+requirements.txt
 output.wav
 processed_speaker.wav
 *.ipynb

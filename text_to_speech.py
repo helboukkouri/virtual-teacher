@@ -8,10 +8,8 @@ import torch
 import torchaudio
 from transformers import AutoTokenizer, AutoModel
 
-from TTS.tts.configs.xtts_config import XttsConfig
 from TTS.tts.models.xtts import Xtts
-from TTS.utils.generic_utils import get_user_data_dir
-from TTS.utils.manage import ModelManager
+
 
 OUTPUT_FILE = "output.wav"
 MAX_CHARS = float("inf")
@@ -36,26 +34,21 @@ def initialize_mms_text_to_speech():
 # TODO: refactor this
 def initialize_xtts_text_to_speech():
     
-    model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
-    ModelManager().download_model(model_name)
-    model_path = os.path.join(get_user_data_dir("tts"), model_name.replace("/", "--"))
-    
-    config = XttsConfig()
-    config.load_json(os.path.join(model_path, "config.json"))
-    
-    model = Xtts.init_from_config(config)
+    from constants import TTS_MODEL_PATH, TTS_MODEL_CONFIG
+
+    model = Xtts.init_from_config(TTS_MODEL_CONFIG)
     model.load_checkpoint(
-        config,
-        checkpoint_path=os.path.join(model_path, "model.pth"),
-        vocab_path=os.path.join(model_path, "vocab.json"),
-        speaker_file_path=os.path.join(model_path, "speakers_xtts.pth"),
+        TTS_MODEL_CONFIG,
+        checkpoint_path=os.path.join(TTS_MODEL_PATH, "model.pth"),
+        vocab_path=os.path.join(TTS_MODEL_PATH, "vocab.json"),
+        speaker_file_path=os.path.join(TTS_MODEL_PATH, "speakers_xtts.pth"),
         eval=True,
         use_deepspeed=False,
     )
     _ = model.cuda()
     model.eval()
     
-    supported_languages = config.languages
+    supported_languages = TTS_MODEL_CONFIG.languages
 
     def convert_text_to_speech(
         text,
@@ -98,9 +91,7 @@ def initialize_xtts_text_to_speech():
         if debug:
             print("Using speaker file:", speaker_wav)
     
-        # Apply all on demand
-        lowpassfilter = denoise = trim = loudness = True
-    
+        # Apply all on demand  
         lowpass_highpass = "lowpass=8000,highpass=75,"
         trim_silence = "areverse,silenceremove=start_periods=1:start_silence=0:start_threshold=0.02,areverse,silenceremove=start_periods=1:start_silence=0:start_threshold=0.02"
         

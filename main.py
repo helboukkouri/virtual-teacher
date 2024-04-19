@@ -3,10 +3,8 @@ import json
 import argparse
 import langcodes
 import subprocess
-from chatbot import generate_response
-from text_to_speech import initialize_xtts_text_to_speech
-from speech_recognition import initialize_whisper_speech_recognition
-from constants import SYSTEM_PROMPT
+
+from constants import SYSTEM_PROMPT, SUPPORTED_LANGUAGES
 
 
 def play_audio():
@@ -55,7 +53,25 @@ if __name__ == "__main__":
         action="store_true",
         help="Use speech recognition to transcribe user input.",
     )
+    argument_parser.add_argument(
+        "--list-languages",
+        action="store_true",
+        help="List available languages (TTS limitation).",
+    )
     args = argument_parser.parse_args()
+
+    if args.list_languages:
+        print("Supported languages:")
+        for lang in SUPPORTED_LANGUAGES:
+            print(f"- {lang}")
+        exit(0)
+
+    # Load this here to avoid loading models unless we plan to actually use them
+    from chatbot import generate_response
+    from text_to_speech import initialize_xtts_text_to_speech
+    from speech_recognition import initialize_whisper_speech_recognition
+
+    # Get the full name of the target language
     language_fullname = langcodes.get(args.language).display_name()
 
     # Initialize text-to-speech    
@@ -92,9 +108,11 @@ if __name__ == "__main__":
 
             for obj in json_objects:                
                 for language, text in obj.items():
+                    if language not in SUPPORTED_LANGUAGES:
+                        language = None
                     print(f"[[ Assistant ({language})]]: {text}\n")
                     speak(text, language=language)
 
     except KeyboardInterrupt:
-        print("\nDebug:")
-        import ipdb;ipdb.set_trace()
+        print("\nGoodbye!")
+        exit(0)

@@ -5,12 +5,13 @@ bitsandbytes
 accelerate
 sentencepiece
 
+TTS  # text to speech
+faster_whisper  # speech recognition
 numpy
 
 sounddevice
+
 cutlet
 fugashi[unidic]  # python -m unidic download
 langcodes[data]
-TTS
-
-ipdb
+langdetect
