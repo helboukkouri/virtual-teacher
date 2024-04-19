@@ -25,7 +25,7 @@ def record_audio():
         q.put(indata.copy())
 
     try:
-        input('Press a key to start recording..')
+        input('Press a ENTER to start recording..')
         # Make sure the file is opened before recording anything:
         with sf.SoundFile(USER_QUERY_AUDIO_FILE, mode='w', samplerate=samplerate, channels=channels) as file:
             with sd.InputStream(samplerate=samplerate, device=device_info["name"], channels=channels, callback=callback):
@@ -47,16 +47,17 @@ def initialize_whisper_speech_recognition():
     model_size = "large-v3"
 
     # Run on GPU with FP16
-    model = WhisperModel(model_size, device="cuda", compute_type="float16")
+    #model = WhisperModel(model_size, device="cuda", compute_type="float16")
     # or run on GPU with INT8
-    # model = WhisperModel(model_size, device="cuda", compute_type="int8_float16")
+    model = WhisperModel(model_size, device="cuda", compute_type="int8_float16")
     # or run on CPU with INT8
     # model = WhisperModel(model_size, device="cpu", compute_type="int8")
 
-    def transcribe_audio():
+    def transcribe_audio(debug=False):
         record_audio()
         segments, info = model.transcribe(USER_QUERY_AUDIO_FILE, beam_size=5)
-        print("Detected language '%s' with probability %f" % (info.language, info.language_probability))
+        if debug:
+            print("Detected language '%s' with probability %f" % (info.language, info.language_probability))
         transcribed_text = "\n".join([segment.text for segment in segments])
         return transcribed_text
 

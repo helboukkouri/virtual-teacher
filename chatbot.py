@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 # Chat settings
-MAX_NEW_TOKENS = 150
+MAX_NEW_TOKENS = 300
 CHAT_HISTORY = []
 
 # Limit LLM GPU memory usage to 10 GB
@@ -25,8 +25,8 @@ torch.cuda.set_per_process_memory_fraction(MEMORY_LIMIT_FRACTION)
 
 
 # Load main LLM
-LLM_MODEL_ID = "openchat/openchat-3.5-0106"
-ASSISTANT_DELIMITER = 'GPT4 Correct Assistant:'
+LLM_MODEL_ID = "meta-llama/Meta-Llama-3-8B-Instruct"#"openchat/openchat-3.5-0106"
+ASSISTANT_DELIMITER = "<|start_header_id|>assistant<|end_header_id|>"#'GPT4 Correct Assistant:'
 tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_ID)
 model = AutoModelForCausalLM.from_pretrained(LLM_MODEL_ID, load_in_4bit=True)
 model.eval()
@@ -34,6 +34,8 @@ model.eval()
 
 def generate_response(text, language, system_prompt=None, keep_chat_history=False, debug=False, **generation_kwargs):
     """Generate a response given a user input."""
+    torch.cuda.empty_cache()
+
     global CHAT_HISTORY
 
     if not keep_chat_history:
@@ -54,28 +56,21 @@ def generate_response(text, language, system_prompt=None, keep_chat_history=Fals
     if debug:
         print(tokenizer.apply_chat_template(CHAT_HISTORY, tokenize=False, add_generation_prompt=True))
 
-    output = model.generate(
+    terminators = [
+        tokenizer.eos_token_id,
+        tokenizer.convert_tokens_to_ids("<|eot_id|>")
+    ]
+
+    outputs = model.generate(
         input_ids,
         max_new_tokens=MAX_NEW_TOKENS,
+        eos_token_id=terminators,
         do_sample=False,
         temperature=0.0,
         **generation_kwargs
     )
-    output = tokenizer.decode(output[0], skip_special_tokens=True)
-    output = output.split(ASSISTANT_DELIMITER)[-1].strip()
+    response = outputs[0][input_ids.shape[-1]:]
+    output = tokenizer.decode(response, skip_special_tokens=True)
+
     CHAT_HISTORY.append({"role": "assistant", "content": output})
     return output
-
-
-if __name__ == "__main__":
-    user_queries = [
-        "Hello, how are you?",
-        "Can you help me learn French?",
-        "How can I ask for directions in French?",
-    ]
-
-    print("\nThe chatbot is ready to chat!\n--->\n")
-    for user_query in user_queries:
-        response = generate_response(user_query)
-        print(f"[[ User ]]: {user_query}")
-        print(f"[[ Assistant ]]: {response}\n")

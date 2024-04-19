@@ -1,3 +1,5 @@
+import re
+import json
 import argparse
 import langcodes
 import subprocess
@@ -14,6 +16,30 @@ def play_audio():
         text=True,
         check=True,
     )
+
+
+# Thanks ChatGPT! :)
+def find_json_objects(input_string):
+    # Regular expression for matching JSON objects
+    json_pattern = r'\{[^{}]*\}'
+    json_objects = []
+
+    while re.search(json_pattern, input_string):
+        matches = re.finditer(json_pattern, input_string)
+        for match in matches:
+            substring = match.group()
+            try:
+                # Attempt to parse the substring as a JSON object
+                json_obj = json.loads(substring)
+                if isinstance(json_obj, dict):  # Ensure it's a dictionary
+                    json_objects.append(json_obj)
+                # Replace the parsed object with spaces to avoid re-matching
+                input_string = input_string.replace(substring, ' ' * len(substring), 1)
+            except json.JSONDecodeError:
+                # Remove the problematic substring and continue
+                input_string = input_string.replace(substring, ' ' * len(substring), 1)
+
+    return json_objects
 
 
 if __name__ == "__main__":
@@ -43,31 +69,32 @@ if __name__ == "__main__":
         transcribe_audio = initialize_whisper_speech_recognition()
 
     print()
-    while True:
-        if args.use_speech_recognition:
-            user_input = transcribe_audio()
-        else:
-            user_input = input("Ask your teacher a question:\n")
-        response = generate_response(
-            user_input,
-            language=args.language,
-            keep_chat_history=False,
-            system_prompt=SYSTEM_PROMPT.format(language=language_fullname),
-            debug=False,
-        )
+    try:
+        while True:
+            if args.use_speech_recognition:
+                user_input = transcribe_audio()
+            else:
+                user_input = input("Ask your teacher a question:\n")
+            response = generate_response(
+                user_input,
+                language=args.language,
+                keep_chat_history=False,
+                system_prompt=SYSTEM_PROMPT.format(language=language_fullname),
+                debug=False,
+            )
+            
+            json_objects = find_json_objects(response)
+            if not json_objects:
+                print("The assistant's response does not contain valid JSONs.")
+                print("Here is the response:")
+                print(response)
+                continue
 
-        sentences = (tuple(filter(lambda x: bool(x.strip()), response.split('\n'))))
-        print(sentences)
-        if len(sentences) == 0:
-            print("Weird: The assistant's response contains 0 sentences.")
-        if len(sentences) == 1:
-            sentences = (sentences[0], sentences[0])
-        elif len(sentences) == 2:
-            pass
-        else:
-            sentences = (sentences[0], sentences[1])
-            print("Warning: The assistant's response contains more than 2 sentences. Only the first 2 sentences will be spoken.")
+            for obj in json_objects:                
+                for language, text in obj.items():
+                    print(f"[[ Assistant ({language})]]: {text}\n")
+                    speak(text, language=language)
 
-        print(f"[[ Assistant ]]: {response}\n")
-        speak(sentences[0])#, language="en")
-        speak(sentences[1], language=args.language)
+    except KeyboardInterrupt:
+        print("\nDebug:")
+        import ipdb;ipdb.set_trace()
